@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackjack</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2E8B57;
+            color: white;
+            text-align: center;
+        }
+
+        #game {
+            margin: 20px auto;
+            width: 400px;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: #4C9B6E;
+        }
+
+        #balance {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            width: 70px;
+            height: 100px;
+            display: inline-block;
+            margin: 5px;
+            position: relative;
+        }
+
+        .hidden {
+            background-color: #333;
+        }
+
+        .buttons {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .betting {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game">
+    <div id="balance">Balance: $1000</div>
+    <div class="betting">
+        <input type="number" id="betAmount" placeholder="Enter bet amount" />
+        <button id="placeBet">Place Bet</button>
+    </div>
+    <div id="dealerArea">
+        <h3>Dealer's Cards</h3>
+        <div id="dealerCards" class="cardArea"></div>
+        <div id="dealerScore">Score: 0</div>
+    </div>
+    <div id="playerArea">
+        <h3>Your Cards</h3>
+        <div id="playerCards" class="cardArea"></div>
+        <div id="playerScore">Score: 0</div>
+    </div>
+    <div class="buttons">
+        <button id="hit" disabled>Hit</button>
+        <button id="stand" disabled>Stand</button>
+    </div>
+    <div id="result" style="font-size: 24px;"></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+let deck = [];
+let playerHand = [];
+let dealerHand = [];
+let playerScore = 0;
+let dealerScore = 0;
+let balance = 1000;
+let bet = 0;
+
+function createDeck() {
+    deck = [];
+    for (let suit of suits) {
+        for (let value of values) {
+            deck.push({ suit, value });
+        }
+    }
+    shuffleDeck();
+}
+
+function shuffleDeck() {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+}
+
+function startGame() {
+    createDeck();
+    playerHand = [drawCard(), drawCard()];
+    dealerHand = [drawCard(), drawCard()];
+    updateScores();
+    renderCards();
+    enableButtons();
+}
+
+function drawCard() {
+    return deck.pop();
+}
+
+function calculateScore(hand) {
+    let score = 0;
+    let aces = 0;
+    for (let card of hand) {
+        if (card.value === 'A') {
+            aces++;
+            score += 11;
+        } else if (['K', 'Q', 'J'].includes(card.value)) {
+            score += 10;
+        } else {
+            score += parseInt(card.value);
+        }
+    }
+    while (score > 21 && aces) {
+        score -= 10;
+        aces--;
+    }
+    return score;
+}
+
+function updateScores(showFullDealerScore = false) {
+    playerScore = calculateScore(playerHand);
+    $('#playerScore').text(`Score: ${playerScore}`);
+    if (showFullDealerScore) {
+        dealerScore = calculateScore(dealerHand);
+        $('#dealerScore').text(`Score: ${dealerScore}`);
+    } else {
+        const visibleDealerScore = calculateScore([dealerHand[0]]);
+        $('#dealerScore').text(`Score: ${visibleDealerScore}`);
+    }
+}
+
+function renderCards() {
+    $('#playerCards').empty();
+    $('#dealerCards').empty();
+    playerHand.forEach(card => {
+        $('#playerCards').append(createCardSVG(card));
+    });
+    $('#dealerCards').append(createCardSVG(dealerHand[0]));
+    $('#dealerCards').append(createCardSVG(dealerHand[1], true));
+}
+
+function revealDealerCards() {
+    $('#dealerCards').empty();
+    dealerHand.forEach(card => {
+        $('#dealerCards').append(createCardSVG(card));
+    });
+    updateScores(true);
+}
+
+function createCardSVG(card, hide = false) {
+    const cardDiv = $('<div class="card"></div>');
+    if (hide) {
+        cardDiv.addClass('hidden').html(`<svg width="70" height="100" style="border: 1px solid black; border-radius: 5px;">
+            <rect width="70" height="100" fill="#333" />
+        </svg>`);
+    } else {
+        const color = (card.suit === 'hearts' || card.suit === 'diamonds') ? 'red' : 'black';
+        cardDiv.html(`<svg width="70" height="100" style="border: 1px solid black; border-radius: 5px;">
+            <rect width="70" height="100" fill="white" />
+            <text x="10" y="20" font-size="16" fill="${color}">${card.value}</text>
+            <text x="10" y="80" font-size="16" fill="${color}">${getSuitSymbol(card.suit)}</text>
+        </svg>`);
+    }
+    return cardDiv;
+}
+
+function getSuitSymbol(suit) {
+    switch (suit) {
+        case 'hearts': return '♥';
+        case 'diamonds': return '♦';
+        case 'clubs': return '♣';
+        case 'spades': return '♠';
+    }
+}
+
+function hit() {
+    if (playerScore < 21) {
+        playerHand.push(drawCard());
+        updateScores();
+        renderCards();
+        if (playerScore > 21) {
+            checkGameOver();
+        }
+    }
+}
+
+function stand() {
+    revealDealerCards();
+    while (dealerScore < 17) {
+        dealerHand.push(drawCard());
+        updateScores(true);
+    }
+    checkGameOver();
+}
+
+function checkGameOver() {
+    disableButtons();
+    if (playerScore > 21) {
+        $('#result').text("You bust! Dealer wins.");
+        balance -= bet;
+    } else if (dealerScore > 21) {
+        $('#result').text("Dealer busts! You win!");
+        balance += bet;
+    } else if (playerScore === 21 && playerHand.length === 2) {
+        $('#result').text("Blackjack! You win with a bonus!");
+        balance += bet * 1.5;
+    } else if (playerScore > dealerScore) {
+        $('#result').text("You win!");
+        balance += bet;
+    } else if (playerScore < dealerScore) {
+        $('#result').text("Dealer wins!");
+        balance -= bet;
+    } else {
+        $('#result').text("It's a tie!");
+    }
+    $('#balance').text(`Balance: $${balance}`);
+    if (balance <= 0) {
+        $('#result').text("You lost all money. Refresh to play.");
+        disableAllButtons();
+    }
+}
+
+function enableButtons() {
+    $('#hit').prop('disabled', false);
+    $('#stand').prop('disabled', false);
+}
+
+function disableButtons() {
+    $('#hit').prop('disabled', true);
+    $('#stand').prop('disabled', true);
+}
+function disableAllButtons() {
+    $('#placeBet').prop('disabled', true);
+    $('#hit').prop('disabled', true);
+    $('#stand').prop('disabled', true);
+}
+
+$('#placeBet').click(function() {
+    const betAmount = parseInt($('#betAmount').val());
+    if (betAmount > 0 && betAmount <= balance) {
+        bet = betAmount;
+        startGame();
+        $('#result').text('');
+    } else {
+        alert("Invalid bet amount!");
+    }
+});
+
+$('#hit').click(hit);
+$('#stand').click(stand);
+
+</script>
+
+</body>
+</html>
